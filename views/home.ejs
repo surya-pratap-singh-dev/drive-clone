@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>My Drive</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.css" rel="stylesheet" />
+  </head>
+
+  <body class="bg-gray-900 text-white">
+    <main class="relative min-h-screen w-screen p-8">
+      
+      <!-- Header with Title -->
+      <div class="max-w-6xl mx-auto mb-8">
+        <h1 class="text-4xl font-bold">My Drive</h1>
+        <p class="text-gray-400 mt-2">Manage your files</p>
+      </div>
+
+      <!-- File List Section -->
+      <div class="max-w-6xl mx-auto">
+        <div id="fileList" class="space-y-3">
+          <!-- Files will be displayed here -->
+          <p class="text-gray-400 text-center py-8">Loading files...</p>
+        </div>
+      </div>
+
+      <!-- Upload Button (Fixed position) -->
+      <button
+        onclick="showPopUp()"
+        class="fixed bottom-8 right-8 z-20 text-white bg-blue-500 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg px-6 py-3 shadow-lg flex items-center gap-2"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Upload Files
+      </button>
+
+      <!-- Popup overlay -->
+      <div class="pop hidden fixed inset-0 z-30 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-lg">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">Upload your file</h2>
+          </div>
+
+          <form id="uploadForm" class="flex flex-col items-center">
+            <div id="dropzone" class="relative flex items-center justify-center w-full h-64 bg-gray-700 rounded-lg border-2 border-dashed border-gray-500 cursor-pointer transition-all">
+              <button type="button" aria-label="Close" onclick="hidePopUp()" class="absolute top-2 right-2 text-gray-400 hover:text-white">
+                ✕
+              </button>
+
+              <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                  <svg class="w-10 h-10 mb-4 text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h3a3 3 0 0 0 0-6h-.025a5.56 5.56 0 0 0 .025-.5A5.5 5.5 0 0 0 7.207 9.021C7.137 9.017 7.071 9 7 9a4 4 0 1 0 0 8h2.167M12 19v-9m0 0-2 2m2-2 2 2" />
+                  </svg>
+                  <p class="mb-2 text-sm text-gray-200">
+                    <span class="font-semibold">Click to upload</span> or drag and drop
+                  </p>
+                  <p class="text-xs text-gray-300">All file types supported</p>
+                  <p id="selectedFileName" class="mt-2 text-sm text-green-400"></p>
+                </div>
+                <input id="dropzone-file" type="file" class="hidden" />
+              </label>
+            </div>
+
+            <p id="uploadStatus" class="mt-3 text-sm"></p>
+
+            <button type="submit" id="uploadBtn" class="mt-5 bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg px-6 py-2">
+              Upload Files
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
+
+    <script>
+      const { createClient } = supabase
+      const supabaseClient = createClient(
+        '<%= process.env.VITE_SUPABASE_URL %>',
+        '<%= process.env.VITE_SUPABASE_ANON_KEY %>'
+      )
+
+      window.addEventListener('DOMContentLoaded', loadFiles)
+
+      // Load files from MongoDB
+      async function loadFiles() {
+        const { data: { user } } = await supabaseClient.auth.getUser()
+        if (!user) {
+          window.location.href = '/login'
+          return
+        }
+
+        try {
+          const response = await fetch(`/api/files/user-files/${user.id}`)
+          const result = await response.json()
+
+          if (!result.success) {
+            console.error('Error:', result.error)
+            document.getElementById('fileList').innerHTML = '<p class="text-red-400 text-center py-8">Error loading files</p>'
+            return
+          }
+
+          displayFiles(result.files)
+        } catch (error) {
+          console.error('Fetch error:', error)
+          document.getElementById('fileList').innerHTML = '<p class="text-red-400 text-center py-8">Error: ' + error.message + '</p>'
+        }
+      }
+
+      function displayFiles(files) {
+        const fileList = document.getElementById('fileList')
+        
+        if (files.length === 0) {
+          fileList.innerHTML = '<p class="text-gray-400 text-center py-8">No files yet. Upload your first file!</p>'
+          return
+        }
+
+        fileList.innerHTML = files.map(file => `
+          <div class="bg-gray-800 p-4 rounded-lg flex justify-between items-center hover:bg-gray-700 transition">
+            <div class="flex-1">
+              <div class="flex items-center gap-3">
+                <div class="text-3xl">
+                  ${getFileIcon(file.fileType)}
+                </div>
+                <div>
+                  <p class="font-medium text-white">${file.fileName}</p>
+                  <p class="text-sm text-gray-400">
+                    ${formatFileSize(file.fileSize)} • 
+                    ${new Date(file.createdAt).toLocaleDateString()} •
+                    ${file.downloadCount} downloads
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="toggleFavorite('${file._id}')" 
+                class="px-3 py-2 rounded text-xl ${file.isFavorite ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-500'}">
+                ${file.isFavorite ? '⭐' : '☆'}
+              </button>
+              <button onclick="downloadFile('${file._id}', '${file.filePath}')" 
+                class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">
+                Download
+              </button>
+              <button onclick="deleteFile('${file._id}', '${file.filePath}')" 
+                class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm">
+                Delete
+              </button>
+            </div>
+          </div>
+        `).join('')
+      }
+
+      function getFileIcon(fileType) {
+        if (!fileType) return '📁'
+        if (fileType.includes('image')) return '🖼️'
+        if (fileType.includes('video')) return '🎥'
+        if (fileType.includes('audio')) return '🎵'
+        if (fileType.includes('pdf')) return '📄'
+        if (fileType.includes('zip') || fileType.includes('rar')) return '📦'
+        return '📁'
+      }
+
+      function formatFileSize(bytes) {
+        if (!bytes) return '0 B'
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+      }
+
+      async function toggleFavorite(fileId) {
+        try {
+          const response = await fetch(`/api/files/favorite/${fileId}`, {
+            method: 'POST'
+          })
+          const result = await response.json()
+          
+          if (result.success) {
+            loadFiles()
+          }
+        } catch (error) {
+          console.error('Error toggling favorite:', error)
+        }
+      }
+
+      async function downloadFile(fileId, filePath) {
+        try {
+          const { data: { user } } = await supabaseClient.auth.getUser()
+
+          await fetch(`/api/files/download/${fileId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          })
+
+          const { data, error } = await supabaseClient.storage
+            .from('drive-bucket')
+            .download(filePath)
+
+          if (error) throw error
+
+          const url = URL.createObjectURL(data)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = filePath.split('/').pop()
+          a.click()
+          
+          setTimeout(() => loadFiles(), 500)
+        } catch (error) {
+          alert('Download failed: ' + error.message)
+        }
+      }
+
+      async function deleteFile(fileId, filePath) {
+        if (!confirm('Delete this file permanently?')) return
+
+        try {
+          const { error: storageError } = await supabaseClient.storage
+            .from('drive-bucket')
+            .remove([filePath])
+
+          if (storageError) throw storageError
+
+          const response = await fetch(`/api/files/delete/${fileId}`, {
+            method: 'DELETE'
+          })
+
+          const result = await response.json()
+
+          if (!result.success) throw new Error(result.error)
+
+          alert('File deleted!')
+          loadFiles()
+        } catch (error) {
+          alert('Delete failed: ' + error.message)
+        }
+      }
+
+      // File selection handler
+      document.getElementById('dropzone-file').addEventListener('change', (e) => {
+        const file = e.target.files[0]
+        if (file) {
+          document.getElementById('selectedFileName').textContent = `Selected: ${file.name}`
+        }
+      })
+
+      // Upload handler
+      document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault()
+        
+        const fileInput = document.getElementById('dropzone-file')
+        const file = fileInput.files[0]
+        const statusEl = document.getElementById('uploadStatus')
+        const uploadBtn = document.getElementById('uploadBtn')
+
+        if (!file) {
+          statusEl.textContent = '⚠️ Please select a file!'
+          statusEl.className = 'mt-3 text-sm text-yellow-400'
+          return
+        }
+
+        uploadBtn.disabled = true
+        uploadBtn.textContent = 'Uploading...'
+        statusEl.textContent = '⏳ Uploading...'
+        statusEl.className = 'mt-3 text-sm text-blue-400'
+
+        try {
+          const { data: { user } } = await supabaseClient.auth.getUser()
+          if (!user) throw new Error('Must be logged in')
+
+          function sanitizeFilename(filename) {
+            const lastDot = filename.lastIndexOf('.')
+            const name = lastDot > 0 ? filename.substring(0, lastDot) : filename
+            const ext = lastDot > 0 ? filename.substring(lastDot) : ''
+            
+            const cleanName = name
+              .replace(/[^\w\s-]/g, '')
+              .replace(/\s+/g, '_')
+              .replace(/_{2,}/g, '_')
+              .toLowerCase()
+            
+            return cleanName + ext
+          }
+
+          const timestamp = Date.now()
+          const cleanFileName = sanitizeFilename(file.name)
+          const filePath = `${user.id}/${timestamp}-${cleanFileName}`
+
+          const { error: uploadError } = await supabaseClient.storage
+            .from('drive-bucket')
+            .upload(filePath, file)
+
+          if (uploadError) throw uploadError
+
+          const { data: urlData } = supabaseClient.storage
+            .from('drive-bucket')
+            .getPublicUrl(filePath)
+
+          const response = await fetch('/api/files/save-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileUrl: urlData.publicUrl,
+              filePath: filePath,
+              fileSize: file.size,
+              fileType: file.type,
+              uploadedBy: user.id
+            })
+          })
+
+          const result = await response.json()
+
+          if (!result.success) throw new Error(result.error)
+
+          statusEl.textContent = '✅ Uploaded!'
+          statusEl.className = 'mt-3 text-sm text-green-400'
+          
+          fileInput.value = ''
+          document.getElementById('selectedFileName').textContent = ''
+          
+          setTimeout(() => {
+            hidePopUp()
+            statusEl.textContent = ''
+            loadFiles()
+          }, 1500)
+
+        } catch (error) {
+          console.error('Upload error:', error)
+          statusEl.textContent = `❌ Error: ${error.message}`
+          statusEl.className = 'mt-3 text-sm text-red-400'
+        } finally {
+          uploadBtn.disabled = false
+          uploadBtn.textContent = 'Upload Files'
+        }
+      })
+
+      // DRAG AND DROP FUNCTIONALITY
+      const dropzone = document.getElementById('dropzone')
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dropzone.classList.add('border-blue-500', 'bg-gray-600', 'border-4')
+      })
+
+      dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dropzone.classList.remove('border-blue-500', 'bg-gray-600', 'border-4')
+      })
+
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dropzone.classList.remove('border-blue-500', 'bg-gray-600', 'border-4')
+        
+        const files = e.dataTransfer.files
+        if (files.length > 0) {
+          const fileInput = document.getElementById('dropzone-file')
+          const dataTransfer = new DataTransfer()
+          dataTransfer.items.add(files[0])
+          fileInput.files = dataTransfer.files
+          
+          document.getElementById('selectedFileName').textContent = `Selected: ${files[0].name}`
+        }
+      })
+
+      function showPopUp() {
+        document.querySelector('.pop').classList.remove('hidden')
+      }
+
+      function hidePopUp() {
+        document.querySelector('.pop').classList.add('hidden')
+        document.getElementById('uploadStatus').textContent = ''
+        document.getElementById('selectedFileName').textContent = ''
+      }
+    </script>
+  </body>
+</html>
