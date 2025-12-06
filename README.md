@@ -131,7 +131,7 @@ Visit `http://localhost:3000` 🎉
 ## 👨‍💻 Author
 
 **Suryaa**  
-GitHub: [@YOUR_USERNAME](https://github.com/FAKE-SURYA)
+GitHub: [@FAKE-SURYA](https://github.com/FAKE-SURYA)
 
 ## 📝 License
 
