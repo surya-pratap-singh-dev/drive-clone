@@ -130,7 +130,7 @@ Visit `http://localhost:3000` 🎉
 ## 👨‍💻 Author
 
 **Suryaa**  
-GitHub: [@FAKE-SURYA](https://github.com/surya-pratap-singh-dev)
+GitHub: [@surya](https://github.com/surya-pratap-singh-dev)
 
 ## 📝 License
 
